@@ -1,0 +1,43 @@
+from kafka import KafkaConsumer
+import json
+from json import load
+from json import dump
+import os
+from io import StringIO,BytesIO
+import pandas as pd
+import time
+from datetime import datetime,timedelta
+from google.cloud import storage
+import parquet
+
+bucket_name = 'your-bucket-name'
+storage_client = storage.Client.from_service_account_json('local-dir-path/service-account-key.json')
+
+consumer = KafkaConsumer(
+    "customers",
+    bootstrap_servers='IP Address:9092',
+    auto_offset_reset='earliest',
+    group_id='Consumer-group-name',
+    value_deserializer=lambda m:json.loads(m.decode('utf-8')))
+
+# Data will be stored in chunks of 6000 records inside folder with timestamp
+
+print("starting the consumer")
+i = 0
+l1 = []
+for msg in consumer:
+    test = msg.value
+    l1.append(test)
+    i = i + 1
+    if i >= 6000:
+        df = pd.DataFrame(l1)
+        f = BytesIO()
+        df.to_parquet(f)
+        f.seek(0)
+        bucket = storage_client.get_bucket(bucket_name)
+        current_date = datetime.now()
+        blob = bucket.blob(f'folder-in-bucket/{current_date}/data.parquet').upload_from_file(f, content_type='parquet')
+        i = 0
+        l1 = []
+
+
