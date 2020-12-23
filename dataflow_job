@@ -1,0 +1,31 @@
+import os
+import apache_beam as beam
+from apache_beam.options.pipeline_options import PipelineOptions
+from apache_beam.options.pipeline_options import SetupOptions
+from apache_beam.options.pipeline_options import GoogleCloudOptions
+from apache_beam.options.pipeline_options import StandardOptions
+from apache_beam.io import BigQuerySink, ReadFromParquet
+from google.cloud import storage
+
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "local-dir/service-account-key.json"
+
+options = PipelineOptions(
+    runner='DataflowRunner',
+    project='{your-project-name}',
+    job_name='{your-job-name}',
+    temp_location='gs://{bucket-name}/temp',
+    region='{your-region}')
+
+table_spec = '{project-name}:{dataset-name}.{table-name}'
+
+table_schema = "field_name1:datatype1,field_name2:datatype2"
+
+with beam.Pipeline(options=options) as p:
+    (p| 'Read files' >> beam.io.ReadFromParquet("gs://{bucket-name}/{folder-name}/data.parquet")
+     | 'Write to BQ' >> beam.io.Write(
+                beam.io.BigQuerySink(
+                    table_spec,
+                    schema=table_schema,
+                    write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
+                    create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED)))
+   
